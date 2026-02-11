@@ -156,6 +156,38 @@
             font-size: 0.9rem;
             color: #6c757d;
         }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        
+        .loading-content {
+            text-align: center;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3d9b11;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
                
         footer {
             bottom: 0;
@@ -193,6 +225,15 @@
   </style>
 </head>
 <body>
+  <!-- ローディングオーバーレイ -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-content">
+      <div class="spinner"></div>
+      <h4>データを読み込み中...</h4>
+      <p id="loadingStatus">初期化しています</p>
+    </div>
+  </div>
+
   <header>
     <h1>沖縄県 野菜市況チャート</h1>
   </header>
@@ -290,13 +331,45 @@
 	  other: []
 	};
 
-// 野菜一覧と価格を取得（改良版）
+	// ローディング状態の更新
+	function updateLoadingStatus(message) {
+	  const statusElement = document.getElementById('loadingStatus');
+	  if (statusElement) {
+	    statusElement.textContent = message;
+	  }
+	  console.log('📊 ステータス:', message);
+	}
+
+	// ローディングオーバーレイを非表示
+	function hideLoading() {
+	  const overlay = document.getElementById('loadingOverlay');
+	  if (overlay) {
+	    overlay.style.display = 'none';
+	  }
+	}
+
+	// 野菜一覧と価格を取得（改良版）
 	async function loadVegetableList() {
 	  try {
-	    console.log('野菜一覧と価格を取得中...');
+	    updateLoadingStatus('野菜一覧を取得中...');
+	    console.log('🔄 野菜一覧と価格を取得中...');
+	    console.log('🌐 API URL:', `${API_BASE_URL}?path=vegetables-list-with-prices`);
 	    
-		const response = await fetch(`${API_BASE_URL}?path=vegetables-list-with-prices`);
+		const response = await fetch(`${API_BASE_URL}?path=vegetables-list-with-prices`, {
+		  method: 'GET',
+		  mode: 'cors',
+		  cache: 'no-cache'
+		});
+		
+		console.log('📡 Response status:', response.status);
+		console.log('📡 Response headers:', response.headers);
+	    
+	    if (!response.ok) {
+	      throw new Error(`HTTP error! status: ${response.status}`);
+	    }
+	    
 	    const result = await response.json();
+	    console.log('✅ 野菜一覧取得結果:', result);
 	    
 	    if (result.status === 'success') {
 	      availableVegetables = result.data.list;
@@ -316,17 +389,18 @@
 	      
 	      createCheckboxes(availableVegetables);
 	      updateTotalCount();
-	      console.log(`${availableVegetables.length}種類の野菜を取得`);
+	      console.log(`✅ ${availableVegetables.length}種類の野菜を取得`);
+	      
 	    } else {
-	      console.error('野菜一覧取得エラー:', result);
+	      console.error('❌ 野菜一覧取得エラー:', result);
 	      document.getElementById('vegetableCheckboxes').innerHTML = 
 	        '<div class="text-center text-danger">野菜一覧の取得に失敗しました</div>';
 	    }
 	    
 	  } catch (error) {
-	    console.error('野菜一覧取得エラー:', error);
+	    console.error('❌ 野菜一覧取得エラー:', error);
 	    document.getElementById('vegetableCheckboxes').innerHTML = 
-	      '<div class="text-center text-danger">野菜一覧の取得に失敗しました</div>';
+	      `<div class="text-center text-danger">野菜一覧の取得に失敗しました<br>${error.message}</div>`;
 	  }
 	}
 
@@ -492,59 +566,79 @@
 	  updateChart();
 	});
 
-	// 野菜一覧と価格を取得
-	async function loadVegetableList() {
-	  try {
-	    console.log('野菜一覧と価格を取得中...');
-	    
-	    const response = await fetch(`${API_BASE_URL}?path=vegetables-list-with-prices`);
-	    const result = await response.json();
-	    
-	    // 以下は既存のコードと同じ
-	    if (result.status === 'success') {
-	      availableVegetables = result.data.list;
-	      vegetablePrices = result.data.prices;
-	      // ... 以下省略
-	    }
-	  } catch (error) {
-	    console.error('野菜一覧取得エラー:', error);
-	  }
-	}
-
 	// APIからデータを取得
 	async function fetchVegetableData() {
 	  try {
-	    console.log('APIから履歴データを取得中...');
+	    updateLoadingStatus('履歴データを取得中...');
+	    console.log('🔄 APIから履歴データを取得中...');
+	    console.log('🌐 API URL:', `${API_BASE_URL}?path=vegetables-history`);
 	    
-	    const response = await fetch(`${API_BASE_URL}?path=vegetables-history`);
+	    const response = await fetch(`${API_BASE_URL}?path=vegetables-history`, {
+	      method: 'GET',
+	      mode: 'cors',
+	      cache: 'no-cache'
+	    });
+	    
+	    console.log('📡 Response status:', response.status);
+	    
+	    if (!response.ok) {
+	      throw new Error(`HTTP error! status: ${response.status}`);
+	    }
+	    
 	    const result = await response.json();
+	    console.log('✅ 履歴データ取得結果:', result);
 	    
-	    // 以下は既存のコードと同じ
 	    if (result.status === 'success') {
 	      allVegetableData = result.data;
 	      allDates = result.dates;
-	      // ... 以下省略
+	      isDataReady = true;
+	      console.log(`✅ ${allDates.length}日分のデータを取得`);
+	      console.log(`✅ ${Object.keys(allVegetableData).length}種類の野菜`);
+	      
+	      // 初期チャートを表示（データなしでも空のチャートを作成）
+	      updateChart();
+	    } else {
+	      throw new Error('データ取得失敗: ' + (result.message || '不明なエラー'));
 	    }
+	    
 	  } catch (error) {
-	    console.error('fetch エラー:', error);
-	    fallbackToBarChart();
+	    console.error('❌ データ取得エラー:', error);
+	    console.log('⚠️ フォールバック処理を実行します');
+	    await fallbackToBarChart();
 	  }
 	}
 
 	// エラー時のフォールバック
 	async function fallbackToBarChart() {
 	  try {
-	    const response = await fetch(`${API_BASE_URL}?path=vegetables`);
+	    updateLoadingStatus('最新データを取得中（フォールバック）...');
+	    console.log('🔄 フォールバック: 最新データを取得中...');
+	    
+	    const response = await fetch(`${API_BASE_URL}?path=vegetables`, {
+	      method: 'GET',
+	      mode: 'cors',
+	      cache: 'no-cache'
+	    });
+	    
+	    if (!response.ok) {
+	      throw new Error(`HTTP error! status: ${response.status}`);
+	    }
+	    
 	    const result = await response.json();
+	    console.log('✅ フォールバックデータ取得結果:', result);
 	    
 	    if (result.status === 'success') {
 	      createBarChart(result.data);
+	    } else {
+	      throw new Error('フォールバックデータ取得失敗');
 	    }
 	  } catch (error) {
-	    console.error('フォールバックもエラー:', error);
+	    console.error('❌ フォールバックもエラー:', error);
+	    alert(`データの取得に失敗しました。\n\n詳細: ${error.message}\n\nGASのデプロイURLが正しいか、スプレッドシートにデータがあるか確認してください。`);
 	  }
 	}
 
+	// 棒グラフを作成（フォールバック用）
 	function createBarChart(data) {
 	  const ctx = document.getElementById('vegetableChart').getContext('2d');
 	  
@@ -586,10 +680,205 @@
 	  });
 	}
 
+	// チャートを更新する関数（メイン）
+	function updateChart() {
+	  const selectedVegetables = Array.from(
+	    document.querySelectorAll('#vegetableCheckboxes input[type="checkbox"]:checked')
+	  ).map(cb => cb.value);
+	  
+	  updateSelectedCount();
+	  
+	  // データが準備できていない場合は空のチャートを表示
+	  if (!isDataReady || !allDates || allDates.length === 0) {
+	    console.log('⚠️ データ未準備のため空チャートを表示');
+	    createEmptyChart();
+	    return;
+	  }
+	  
+	  // 選択された野菜がない場合も空のチャートを表示
+	  if (selectedVegetables.length === 0) {
+	    console.log('ℹ️ 野菜が選択されていないため空チャートを表示');
+	    createEmptyChart();
+	    return;
+	  }
+	  
+	  console.log('📊 チャート更新:', selectedVegetables);
+	  
+	  const ctx = document.getElementById('vegetableChart').getContext('2d');
+	  
+	  if (chartInstance) {
+	    chartInstance.destroy();
+	  }
+	  
+	  const datasets = selectedVegetables.map((vegetable, index) => {
+	    const vegetableHistory = allVegetableData[vegetable] || [];
+	    
+	    // 日付ごとのデータマップを作成
+	    const dataMap = {};
+	    vegetableHistory.forEach(item => {
+	      dataMap[item.date] = item.price;
+	    });
+	    
+	    // 全日付に対してデータを配置（データがない日はnull）
+	    const data = allDates.map(date => dataMap[date] || null);
+	    
+	    return {
+	      label: vegetable,
+	      data: data,
+	      borderColor: colors[index % colors.length],
+	      backgroundColor: colors[index % colors.length] + '33',
+	      borderWidth: 2,
+	      fill: false,
+	      tension: 0.1,
+	      spanGaps: true // 欠損値を線で繋ぐ
+	    };
+	  });
+	  
+	  chartInstance = new Chart(ctx, {
+	    type: 'line',
+	    data: {
+	      labels: allDates,
+	      datasets: datasets
+	    },
+	    options: {
+	      responsive: true,
+	      maintainAspectRatio: false,
+	      interaction: {
+	        mode: 'index',
+	        intersect: false,
+	      },
+	      plugins: {
+	        title: {
+	          display: true,
+	          text: '沖縄県青果市況 価格推移（過去30日間）',
+	          font: {
+	            size: 16
+	          }
+	        },
+	        legend: {
+	          display: true,
+	          position: 'top',
+	          labels: {
+	            boxWidth: 15,
+	            padding: 10,
+	            font: {
+	              size: 11
+	            }
+	          }
+	        },
+	        tooltip: {
+	          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+	          titleFont: {
+	            size: 14
+	          },
+	          bodyFont: {
+	            size: 13
+	          },
+	          padding: 12,
+	          callbacks: {
+	            label: function(context) {
+	              let label = context.dataset.label || '';
+	              if (label) {
+	                label += ': ';
+	              }
+	              if (context.parsed.y !== null) {
+	                label += '¥' + context.parsed.y.toFixed(0) + '/kg';
+	              }
+	              return label;
+	            }
+	          }
+	        }
+	      },
+	      scales: {
+	        x: {
+	          display: true,
+	          title: {
+	            display: true,
+	            text: '日付'
+	          },
+	          ticks: {
+	            maxRotation: 45,
+	            minRotation: 45,
+	            font: {
+	              size: 10
+	            }
+	          }
+	        },
+	        y: {
+	          display: true,
+	          title: {
+	            display: true,
+	            text: '価格（円/kg）'
+	          },
+	          beginAtZero: true,
+	          ticks: {
+	            callback: function(value) {
+	              return '¥' + value;
+	            }
+	          }
+	        }
+	      }
+	    }
+	  });
+	  
+	  console.log('✅ チャート更新完了');
+	}
+
+	// 空のチャートを作成
+	function createEmptyChart() {
+	  const ctx = document.getElementById('vegetableChart').getContext('2d');
+	  
+	  if (chartInstance) {
+	    chartInstance.destroy();
+	  }
+	  
+	  chartInstance = new Chart(ctx, {
+	    type: 'line',
+	    data: {
+	      labels: [],
+	      datasets: []
+	    },
+	    options: {
+	      responsive: true,
+	      maintainAspectRatio: false,
+	      plugins: {
+	        title: {
+	          display: true,
+	          text: '野菜を選択してください',
+	          font: {
+	            size: 16
+	          }
+	        }
+	      }
+	    }
+	  });
+	}
+
 	// ページ読み込み後の処理
 	document.addEventListener('DOMContentLoaded', async function() {
-	  await loadVegetableList();
-	  await fetchVegetableData();
+	  console.log('🚀 アプリケーション開始');
+	  console.log('🌐 API Base URL:', API_BASE_URL);
+	  
+	  try {
+	    // 1. 野菜一覧を取得
+	    await loadVegetableList();
+	    
+	    // 2. 履歴データを取得
+	    await fetchVegetableData();
+	    
+	    console.log('✅ 初期化完了');
+	    updateLoadingStatus('完了！');
+	    
+	    // ローディングを非表示
+	    setTimeout(() => {
+	      hideLoading();
+	    }, 500);
+	    
+	  } catch (error) {
+	    console.error('❌ 初期化エラー:', error);
+	    alert(`初期化に失敗しました。\n\n詳細: ${error.message}\n\nページをリロードしてください。`);
+	    hideLoading();
+	  }
 	});
   </script>
 </body>
